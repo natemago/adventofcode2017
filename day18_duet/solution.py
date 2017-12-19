@@ -16,15 +16,22 @@ def load_input(f):
     return instructions
 
 class SndComputer:
-    def __init__(self, mem, pid=0, on_send=None, on_recv=None):
-        self.pid = pid
+    def __init__(self, mem, pid=0, sendq=None, recvq=None, debug=False):
+        self.pid = 'M%d'%pid
         self.regs = {'p':pid}
         self.mem = mem or []
         self.PC = 0
         self.sndOut = None
         self.recovered = None
-        self.on_send = on_send
-        self.on_recv = on_recv
+        self.sendq = sendq
+        self.recvq = recvq
+        self.sendcount = 0
+        self.state = 'EXEC'
+        self.debug = debug
+
+    def write(self, *args):
+        if self.debug:
+            print('[%s]:' % self.pid, *args)
 
     def decode_val(self, v):
         if isinstance(v, int):
@@ -36,7 +43,6 @@ class SndComputer:
         return v
 
     def set_to_reg(self, a, b):
-        #print(a, '<-', b)
         if self.regs.get(a) is None:
             self.regs[a] = 0
         if isinstance(b, int):
@@ -52,19 +58,14 @@ class SndComputer:
             raise Exception("Halted")
 
         inst = self.mem[self.PC]
-
-        for k,v in self.regs.items():
-            if k is None:
-                print(self.pid, inst, self.regs)
-                raise Exception('None reg name. Bug.')
-
-        print('[M%d]:'%self.pid,self.PC, inst, self.regs)
-
+        self.write(self.PC, inst, self.regs, self.state, 'inq:', self.recvq, 'outq:', self.sendq)
         name = inst[0]
         if name == 'snd':
             self.sndOut = self.decode_val(inst[1])
-            if self.on_send:
-                self.on_send(self, self.sndOut)
+            if self.sendq is not None:
+                self.sendq.append(self.sndOut)
+                self.write('OUT', self.sndOut)
+                self.sendcount += 1
             self.PC += 1
         elif name == 'set':
             self.set_to_reg(inst[1], inst[2])
@@ -84,9 +85,15 @@ class SndComputer:
                 self.regs[inst[1]] = 0
             if self.regs[inst[1]] != 0:
                 self.recovered = self.sndOut
-                #print('Recovered: ', self.recovered)
-            if self.on_recv:
-                self.on_recv(self, inst[1])
+            if self.recvq is not None:
+                if len(self.recvq):
+                    self.state = 'EXEC'
+                    self.set_to_reg(inst[1], self.recvq[0])
+                    self.recvq.remove(self.recvq[0])
+                else:
+                    self.state = 'WAIT'
+                    return
+
             self.PC += 1
         elif name == 'mod':
             a = self.decode_val(inst[1])
@@ -94,12 +101,9 @@ class SndComputer:
             self.set_to_reg(inst[1], a%b)
             self.PC += 1
         elif name == 'jgz':
-            print(self.pid,'->', self.regs)
             a = self.decode_val(inst[1])
             b = self.decode_val(inst[2])
-            print(self.pid,'-->', self.regs)
             if a > 0:
-                #print('jump: ', b, '; PC=', self.PC)
                 self.PC += b
                 return
             self.PC += 1
@@ -111,64 +115,26 @@ def part1(instructions):
 
     while True:
         com.next()
-        print(com.regs)
         if com.recovered is not None:
             return com.recovered
         #input()
 
 
 def part2(instructions):
-    M = {'m0': {'snd': [], 'rcv': [], 'state': 'ok', 'count': 0}, 'm1': {'snd': [], 'rcv': [], 'state': 'ok', 'count': 0}}
+    q1 = []
+    q2 = []
 
-    def on_send(m, val):
-        #print(m.pid, 'sends', val)
-        opid = 'm0' if m.pid == 1 else 'm1'
-        pid = 'm%d'%m.pid
-        M[pid]['snd'].append(val)
-        if M[opid]['state'] == 'wait_rcv' and M[opid]['wait_rcv']:
-            on_recv(M[opid]['machine'], M[opid]['wait_rcv'])
-        M[pid]['count'] += 1
-
-    def on_recv(m, reg):
-        #print(m.pid, 'waits val in', reg)
-        opid = 'm0' if m.pid == 1 else 'm1'
-        pid = 'm%d'%m.pid
-        if len(M[opid]['snd']):
-            val = M[opid]['snd'][0]
-            M[opid]['snd'] = M[opid]['snd'][1:]
-            m.set_to_reg(reg, val)
-            M[pid]['state'] = 'ok'
-            return
-
-        M[pid]['state'] = 'wait_rcv'
-        M[pid]['wait_rcv'] = reg
-
-    m0 = SndComputer(pid=0, mem=instructions, on_send=on_send, on_recv=on_recv)
-    m1 = SndComputer(pid=1, mem=instructions, on_send=on_send, on_recv=on_recv)
-
-    M['m0']['machine'] = m0
-    M['m1']['machine'] = m1
+    m0 = SndComputer(pid=0, mem=instructions, sendq=q1, recvq=q2)
+    m1 = SndComputer(pid=1, mem=instructions, sendq=q2, recvq=q1)
 
     while True:
-        #print(M['m0'])
-        #print(M['m1'])
-        if M['m0']['state'] == 'wait_rcv' and M['m1']['state'] == 'wait_rcv':
-            print('Deadlock')
-            print(M)
-            break
-        if M['m0']['state'] == 'ok':
-            m0.next()
-        else:
-            print('M0 waits')
-        if M['m1']['state'] == 'ok':
-            m1.next()
-        else:
-            print('M1 waits')
-        #input()
+        if m0.state == 'WAIT' and m1.state == 'WAIT':
+            print('Deadlock reached')
+            return m1.sendcount
+        m0.next()
+        m1.next()
 
-
-instructions = load_input('test_input_p2')
 instructions = load_input('input')
 
-#print('Part1: ', part1(instructions))
+print('Part1: ', part1(instructions))
 print('Part2: ', part2(instructions))
