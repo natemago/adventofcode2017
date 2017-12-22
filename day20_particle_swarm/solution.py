@@ -75,42 +75,48 @@ re.findall('(p|a|v)=<([\\d,]+)>','p=<1,2,3>, v=<12,34,56>, a=<123,3>')
 import re
 
 
+class Particle:
+  def __init__(self, n, p, v, a):
+    self.n = n
+    self.p = p
+    self.a = a
+    self.v = v
+
+
 mn = None
 c=0
 with open('input') as f:
-	for ln in f:
-		p=ln.strip().split('>, ')
-		a=[int(i.strip()) for i in p[2].strip()[3:-1].split(',')]
-
-				
-
-#				print(a)
-		#if mn is None:
-		s=sum([abs(i) for i in a]) 
-		if mn is None:
-			mn=(s,a,ln,c)
-		if mn[0] >= s:
-			mn=(s,a,ln,c)
-		c+=1
+  for ln in f:
+     specs = re.findall('(p|a|v)=<([\\d,]+)>', line.strip())
+     print(specs)
+     
+     p=ln.strip().split('>, ')
+     a=[int(i.strip()) for i in p[2].strip()[3:-1].split(',')]
+     s=sum([abs(i) for i in a]) 
+     if mn is None:
+       mn=(s,a,ln,c)
+     if mn[0] >= s:
+       mn=(s,a,ln,c)
+     c+=1
 print(mn)
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
