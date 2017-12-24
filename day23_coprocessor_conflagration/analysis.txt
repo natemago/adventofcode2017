@@ -1,0 +1,81 @@
+Taken at face value, the assembly program
+runs the following procedure:
+
+a = 1
+b = 67
+c = b
+
+if a != 0: 
+    goto: label_1  # this is a switch for part1/part2
+
+goto: label_2 # we never exec this in part 2
+
+label_1:
+    
+    # set up b and c to their initial values (67*100+100000 and 67*100+100000+17000 respectively)
+    # notice that b and c differ by 17000
+    
+    b = b * 100
+    b = b + 100000
+    c = b
+    c = c + 17000
+    
+    # code up to here is never repeated
+    
+    label_2: # will end up being a while loop that goes until b <= c with increment of 17
+        f = 1 # loop init
+        d = 2 # loop init
+        
+        label_5: # will end up being nested loop going from 2 up to b (loop for e)
+            e = 2 # loop init
+            
+            label_4: # loop start for 2 up to b (loop for d)
+                g = d        
+                g = g * e
+                g = g-b     # these 3 lines do: g = d*e - b
+                
+                if g != 0: # basically if d*e != b,
+                    goto: label_3  # this skips f = 0
+                
+                f = 0
+                       # from label_4 to label_3, basically we have:
+                       # if d*e == b:
+                       #     f = 0
+                label_3:
+                    e = e + 1 # incrment e
+                    g = e
+                    g = g - b # g = e - b
+                    
+                    if g != 0: # check if e reached b (e-b != 0)
+                        goto: label_4 # if not, start loop again at label_4
+                    
+                    d = d + 1 # increment d
+                    g = d
+                    g = g - b
+                    
+                    if g != 0:
+                        goto: label_5 # check if d has reached b. If not, go to loop start at label_5
+                    
+                    
+                    # we're outside the two nested loops for e and d
+                    
+                    
+                    # check if f has been set to 0. This happens wayyy up between label_4 and label_3 if the check e*d == b is satisfied.
+                    if f != 0:
+                        goto: label_6 # if f==0, skip h = h + 1
+                    
+                    h = h + 1 # increment h
+                    
+                    label_6:
+                        g = b
+                        g = g - c
+                        
+                        if g != 0: # check if b have reached c
+                            goto: label_7 # if not, skip the halt
+                        
+                        HALT # jump outside the memory range
+                        
+                        label_7:
+                            b = b + 17 # if the cond. after label_6 is satisfied (b-c!=0). If not, increment b by 17
+                            goto: label_2 # go to the main loop at label_2
+                        
